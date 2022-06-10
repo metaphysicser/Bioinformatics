@@ -20,8 +20,6 @@ class MSA_tree(object):
         self.strs = strs
         self.len = len(strs)
         self.tree = []
-        self.dis_matrix = self.pair_distance(self.strs)
-        self.init_distance = self.dis_matrix
         self.build_tree()
 
 
@@ -31,8 +29,9 @@ class MSA_tree(object):
         """
         align center sequence with others
         """
+        print("begin to build distance matrix")
         dis_matrix = np.zeros((len(strs), len(strs)))
-        for i in range(len(strs)):
+        for i in trange(len(strs)):
             for j in range(1, len(strs)):
                 distance = Levenshtein.distance(strs[i], strs[j])
                 dis_matrix[i][j] = dis_matrix[j][i] = distance
@@ -69,7 +68,7 @@ class MSA_tree(object):
             self.alignset(near2, elements2, B_gap_loc)
             return elements1+elements2
     def find_nearest(self, set1,set2):
-        min_value = 10000
+        min_value = 100000
         near1 = 0
         near2 = 0
         for i in set1:
@@ -86,8 +85,15 @@ class MSA_tree(object):
                 index = 0
                 for gap in gap_loc:
                     if gap == 0:
-                        new += self.strs[seq][index]
-                        index += 1
+                        try:
+                            new += self.strs[seq][index]
+                            index += 1
+                        except Exception as e:
+                            print("index: {}".format(index))
+                            print("gap_length: {}".format(len(gap_loc)-sum(gap_loc)))
+                            print("str length: {}".format(len(self.strs[seq])))
+                            print(e)
+                            new += "-"
                     else:
                         new += "-"
                 self.strs[seq] = new
@@ -96,6 +102,9 @@ class MSA_tree(object):
 
 
     def build_tree(self):
+        print("begin to generate guide tree")
+        self.dis_matrix = self.pair_distance(self.strs)
+        self.init_distance = self.dis_matrix
         self.map = {}
         for i in range(len(self.strs)):
             self.map[i] = i
@@ -171,8 +180,11 @@ class MSA_tree(object):
 
 # data = ["AAATTT","TTCAA","FUJHJK","FYUYG","ghvefajih","FGYTVYUIFVG"]
 #
-data = readfasta('data/dna500.fasta')[1]
-print(data)
+data = readfasta('data/2019nCoVR_20200301/2019nCoVR_20200301.fasta')[1][:30]
+for i in range(len(data)):
+    data[i] = data[i].upper()
+# data = readfasta('data/dna500.fasta')[1]
+
 m = MSA_tree(data)
-print(m)
+
 
