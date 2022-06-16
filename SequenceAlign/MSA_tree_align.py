@@ -1,12 +1,3 @@
-'''
-multiple sequence alignment
-- center star method
-
-author: Juntao Chen
-date: 12.29.2021
-'''
-from copy import deepcopy, copy
-
 import Levenshtein
 import numpy as np
 import time
@@ -180,7 +171,7 @@ class MSA_tree(object):
 
 # data = ["AAATTT","TTCAA","FUJHJK","FYUYG","ghvefajih","FGYTVYUIFVG"]
 #
-data = readfasta('data/2019nCoVR_20200301/2019nCoVR_20200301.fasta')[1][:30]
+data = readfasta('data/2019nCoVR_20200301/2019nCoVR_20200301.fasta')[1][:5]
 for i in range(len(data)):
     data[i] = data[i].upper()
 # data = readfasta('data/dna500.fasta')[1]
