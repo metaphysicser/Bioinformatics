@@ -105,7 +105,7 @@ def MSA_star(strs):
 
     return Value_SP, strsAligned
 
-data = readfasta('data/2019nCoVR_20200301/2019nCoVR_20200301.fasta')[1][:30]
+data = readfasta('data/2019nCoVR_20200301/2019nCoVR_20200301.fasta')[1][:20]
 for i in range(len(data)):
     data[i] = data[i].upper()
 m = MSA_star(data)

@@ -14,8 +14,6 @@ class MSA_tree(object):
         self.build_tree()
 
 
-
-
     def pair_distance(self, strs: list):
         """
         align center sequence with others
@@ -93,69 +91,74 @@ class MSA_tree(object):
 
 
     def build_tree(self):
+        """
+        生成指导树，参考博客 https://blog.csdn.net/m0_49960764/article/details/121495721
+        :return:
+        """
+        sTime = time.time()
         print("begin to generate guide tree")
-        self.dis_matrix = self.pair_distance(self.strs)
-        self.init_distance = self.dis_matrix
-        self.map = {}
+        self.dis_matrix = self.pair_distance(self.strs)  # 计算序列之间的距离矩阵，使用 Levenshtein 距离
+        self.init_distance = self.dis_matrix # 之后每对齐序列，距离矩阵都会更改，因此记录下最开始的距离矩阵
+        self.map = {}  # 距离矩阵中的index和实际序列之间的映射
         for i in range(len(self.strs)):
             self.map[i] = i
 
-
-        sTime = time.time()
-        self.r_dis = {}
+        self.r_dis = {} # 净分化距离
         list_len = self.len
         for seq in range(self.len):
             r_distance = 0
             for j in range(self.len):
                 if self.dis_matrix[seq][j] is not None:
                     r_distance += self.dis_matrix[seq][j]
-            self.r_dis[seq] = r_distance
-        if self.len > 2:
+            self.r_dis[seq] = r_distance  # 记录每个序列的净分化距离
+        if self.len > 2:  # 如果只有两条序列，就没必要计算了
             M_matrix = np.zeros((list_len, list_len))
             for i in self.r_dis.keys():
                 for j in self.r_dis.keys():
                     if i != j:
+                        """
+                        计算分类群的距离矩阵，在实验中，我发现当我删去距离公式的后半部分。
+                        也就是该行代码的后半部分，代码运行速度有了一些提升，但是sp值变化没有特别明显，我认为有趣便保留了下来。我进行了使用20条序列进行了简单实验：
+                        博客思路： time：31.95s   SP：5669004
+                        我修改的代码： time：27.44s SP：5667473
+                        """
                         M_matrix[i][j] = M_matrix[i][j] = self.dis_matrix[i][j] # - (self.r_dis[i] + self.r_dis[j]) / (list_len - 2)
 
-
         while self.len > 2:
-
             min_value = 10000
 
             for i in self.map.keys():
-                for j in  self.map.keys():
+                for j in self.map.keys():
                     if i != j and M_matrix[i][j] < min_value:
                         min_value = M_matrix[i][j]
                         pair = [i, j]
-            l1, l2 = pair[0], pair[1]
+            l1, l2 = pair[0], pair[1]  # 找到距离最近都两个分类群
 
-
-
-            self.map[l1] = [self.map[l1], self.map.pop(l2)]
+            self.map[l1] = [self.map[l1], self.map.pop(l2)] # [1,2,[3,4]] ->[1,[2,[3,4]]] 2和[3，4]距离最短
 
             self.len -= 1
-            print(self.len)
-
-
 
             for i in self.map.keys():
                 if i != l1:
                     # dis = self.dis_matrix[l1][i] if self.dis_matrix[l1][i] > self.dis_matrix[l2][i] else self.dis_matrix[l2][i]
                     # self.dis_matrix[l1][i] = self.dis_matrix[i][l1] = dis
+                    """
+                    更新距离矩阵，可以尝试不同定义的距离
+                    """
                     self.dis_matrix[l1][i] = self.dis_matrix[i][l1] = (self.dis_matrix[l1][i] + self.dis_matrix[l2][i] -  self.dis_matrix[l1][l2]) / 2
 
             M_matrix = np.zeros((list_len, list_len))
-            for i in  self.map.keys():
+            # 更新M矩阵
+            for i in self.map.keys():
                 for j in  self.map.keys():
                     if i != j:
-                        M_matrix[i][j] = M_matrix[i][j] = self.dis_matrix[i][j] #  - (self.r_dis[i] + self.r_dis[j]) / (list_len - 2)
+                        M_matrix[i][j] = M_matrix[i][j] = self.dis_matrix[i][j] # - (self.r_dis[i] + self.r_dis[j]) / (list_len - 2)
 
-        l1, l2 = self.map.keys()
+        l1, l2 = self.map.keys()  # 最后只剩两个分类群
 
+        self.tree = [self.map[l1], self.map[l2]] # 生成指导树
 
-        self.tree = [self.map[l1], self.map[l2]]
-
-        self.compile_tree(self.tree)
+        self.compile_tree(self.tree)  # 递归进行比对
 
         Value_SP = spscore(self.strs)
         eTime = time.time()
@@ -171,7 +174,7 @@ class MSA_tree(object):
 
 # data = ["AAATTT","TTCAA","FUJHJK","FYUYG","ghvefajih","FGYTVYUIFVG"]
 #
-data = readfasta('data/2019nCoVR_20200301/2019nCoVR_20200301.fasta')[1][:5]
+data = readfasta('data/2019nCoVR_20200301/2019nCoVR_20200301.fasta')[1][:20]
 for i in range(len(data)):
     data[i] = data[i].upper()
 # data = readfasta('data/dna500.fasta')[1]
