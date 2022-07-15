@@ -6,6 +6,75 @@ from FASTA import readfasta
 from score import spscore
 from tqdm import trange
 
+def findCenterSeq(strs: list):
+    """
+    to find the center sequence
+    Returns:
+        index of center sequence
+    """
+    s_psa = [[-float('Inf')] * len(strs) for _ in range(len(strs))]
+
+    for i in range(len(strs)):
+        if i % (len(strs) // 10 + 1) == 0.0:
+            print(" => ", end="", flush=True)
+
+        for j in range(len(strs)):
+            if j > i:
+                tmp, _, _,_,_ = PSA_AGP_Kband(strs[i], strs[j])
+                s_psa[i][j] = s_psa[j][i] = tmp
+            elif j == i:
+                s_psa[i][i] = 0
+
+    idxC = np.argmax(np.sum(s_psa, axis=0))
+
+    return idxC
+
+def gap_count(gap):
+    new_gap = [0 for i in range((len(gap)-sum(gap)+1))]
+    counter = 0
+    index = 0
+
+    for i in gap:
+        if i == 1:
+            counter += 1
+
+        elif i == 0:
+            new_gap[index] = counter
+            counter = 0
+            index += 1
+    new_gap[index] = counter
+    return new_gap
+
+
+def psa(strs: list, idxC: int):
+    """
+    align center sequence with others
+    """
+    strsAligned = []
+    gap_counter = []
+    for i in range(len(strs)):
+        if i != idxC:
+            _, tmp1, tmp2,gap_A,gap_B = PSA_AGP_Kband(strs[idxC], strs[i])
+            strsAligned.append(tmp2)
+            print(len(tmp2))
+            gap_counter.append(gap_count(gap_A))
+        else:
+            strsAligned.append(strs[idxC])
+            gap_counter.append([0 for i in range(len(strs[idxC])+1)])
+            print(len(strs[idxC]))
+
+    return strsAligned, gap_counter
+
+def insert_gap(gap,strs):
+    length = len(gap)
+    new_str = ""
+    for i in range(len(strs)):
+        if i<length and gap[i] != 0:
+            new_str += "-"*gap[i]
+        new_str += strs[i]
+    return new_str
+
+
 class MSA_tree(object):
     def __init__(self, strs):
         self.strs = strs
@@ -124,47 +193,80 @@ class MSA_tree(object):
                         """
                         M_matrix[i][j] = M_matrix[i][j] = self.dis_matrix[i][j] # - (self.r_dis[i] + self.r_dis[j]) / (list_len - 2)
 
-        while self.len > 2:
-            min_value = 10000
+        min_index= 0
+        min_value = 0
+        value = 0
+        for i in self.map.keys():
+            for j in self.map.keys():
+                if i != j:
+                    value += M_matrix[i][j]
+            if value < min_value:
+                min_value = value
+                min_index = i
+        idxC = min_index
+        # 2. do pairwise alignments
+        strsAligned, gap_counter = psa(self.strs, idxC)
 
-            for i in self.map.keys():
-                for j in self.map.keys():
-                    if i != j and M_matrix[i][j] < min_value:
-                        min_value = M_matrix[i][j]
-                        pair = [i, j]
-            l1, l2 = pair[0], pair[1]  # 找到距离最近都两个分类群
+        gap = np.array(gap_counter)
 
-            self.map[l1] = [self.map[l1], self.map.pop(l2)] # [1,2,[3,4]] ->[1,[2,[3,4]]] 2和[3，4]距离最短
+        gap_matrix = np.tile(np.max(gap, axis=0), (gap.shape[0], 1)) - gap
 
-            self.len -= 1
+        new_strs = []
 
-            for i in self.map.keys():
-                if i != l1:
-                    # dis = self.dis_matrix[l1][i] if self.dis_matrix[l1][i] > self.dis_matrix[l2][i] else self.dis_matrix[l2][i]
-                    # self.dis_matrix[l1][i] = self.dis_matrix[i][l1] = dis
-                    """
-                    更新距离矩阵，可以尝试不同定义的距离
-                    """
-                    self.dis_matrix[l1][i] = self.dis_matrix[i][l1] = (self.dis_matrix[l1][i] + self.dis_matrix[l2][i] -  self.dis_matrix[l1][l2]) / 2
+        for i in range(len(gap_counter)):
+            new_str = insert_gap(gap_matrix[i, :], strsAligned[i])
+            new_strs.append(new_str)
 
-            M_matrix = np.zeros((list_len, list_len))
-            # 更新M矩阵
-            for i in self.map.keys():
-                for j in  self.map.keys():
-                    if i != j:
-                        M_matrix[i][j] = M_matrix[i][j] = self.dis_matrix[i][j] # - (self.r_dis[i] + self.r_dis[j]) / (list_len - 2)
-
-        l1, l2 = self.map.keys()  # 最后只剩两个分类群
-
-        self.tree = [self.map[l1], self.map[l2]] # 生成指导树
-
-        self.compile_tree(self.tree)  # 递归进行比对
-
-        Value_SP = spscore(self.strs)
+        Value_SP = spscore(new_strs)
         eTime = time.time()
-
         print("Run time : %.2f s" % (eTime - sTime))
         print("SP : ", Value_SP)
+
+
+                        
+
+
+        # while self.len > 2:
+        #     min_value = 10000
+        #
+        #     for i in self.map.keys():
+        #         for j in self.map.keys():
+        #             if i != j and M_matrix[i][j] < min_value:
+        #                 min_value = M_matrix[i][j]
+        #                 pair = [i, j]
+        #     l1, l2 = pair[0], pair[1]  # 找到距离最近都两个分类群
+        #
+        #     self.map[l1] = [self.map[l1], self.map.pop(l2)] # [1,2,[3,4]] ->[1,[2,[3,4]]] 2和[3，4]距离最短
+        #
+        #     self.len -= 1
+        #
+        #     for i in self.map.keys():
+        #         if i != l1:
+        #             # dis = self.dis_matrix[l1][i] if self.dis_matrix[l1][i] > self.dis_matrix[l2][i] else self.dis_matrix[l2][i]
+        #             # self.dis_matrix[l1][i] = self.dis_matrix[i][l1] = dis
+        #             """
+        #             更新距离矩阵，可以尝试不同定义的距离
+        #             """
+        #             self.dis_matrix[l1][i] = self.dis_matrix[i][l1] = (self.dis_matrix[l1][i] + self.dis_matrix[l2][i] -  self.dis_matrix[l1][l2]) / 2
+        #
+        #     M_matrix = np.zeros((list_len, list_len))
+        #     # 更新M矩阵
+        #     for i in self.map.keys():
+        #         for j in  self.map.keys():
+        #             if i != j:
+        #                 M_matrix[i][j] = M_matrix[i][j] = self.dis_matrix[i][j] # - (self.r_dis[i] + self.r_dis[j]) / (list_len - 2)
+        #
+        # l1, l2 = self.map.keys()  # 最后只剩两个分类群
+        #
+        # self.tree = [self.map[l1], self.map[l2]] # 生成指导树
+        #
+        # self.compile_tree(self.tree)  # 递归进行比对
+        #
+        # Value_SP = spscore(self.strs)
+        # eTime = time.time()
+        #
+        # print("Run time : %.2f s" % (eTime - sTime))
+        # print("SP : ", Value_SP)
 
 
 
@@ -174,7 +276,7 @@ class MSA_tree(object):
 
 # data = ["AAATTT","TTCAA","FUJHJK","FYUYG","ghvefajih","FGYTVYUIFVG"]
 #
-data = readfasta('data/2019nCoVR_20200301/2019nCoVR_20200301.fasta')[1][:20]
+data = readfasta('data/16srRNA(small).fasta')[1][:20]
 for i in range(len(data)):
     data[i] = data[i].upper()
 # data = readfasta('data/dna500.fasta')[1]
