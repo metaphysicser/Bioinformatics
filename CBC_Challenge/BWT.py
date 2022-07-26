@@ -14,6 +14,7 @@ class BWT(object):
         self.T = strings + "#"  # 正序
         self.len = len(strings)
         self.thorehold = len(strings) // 10000 if len(strings) // 10000 >= 15 else 15
+        # self.thorehold = 20
         self.BWT()
 
     def bz_sort(self):  # 倍增排序求 后缀数组，L
