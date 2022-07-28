@@ -226,4 +226,12 @@ if __name__ == '__main__':
     # for i in data.values():
     #     print(len(i))
 
-    data_process(1)
+    with open("data/sample/simulate_read.sample.unalign.fastq", "r") as f:
+        data = f.read()
+    str_dict = {}
+    match_fasta(str_dict, data)
+    #  写入pkl文件
+    with open(f"data/data_process/sample.unalign.pkl", "wb") as f:
+        pickle.dump(str_dict, f)
+
+
